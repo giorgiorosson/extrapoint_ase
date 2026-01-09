@@ -2077,7 +2077,7 @@ void PutChar( uint16_t Xpos, uint16_t Ypos, uint8_t ASCI, uint16_t charColor, ui
 void GUI_Text(uint16_t Xpos, uint16_t Ypos, uint8_t *str,uint16_t Color, uint16_t bkColor);
 # 10 "Source/RIT/IRQ_RIT.c" 2
 
-// Patch colori di sicurezza (nel caso GLCD.h non li esporti correttamente)
+// Patch colori di sicurezza
 # 23 "Source/RIT/IRQ_RIT.c"
 volatile int down_0 = 0;
 volatile int down_1 = 0;
@@ -2091,10 +2091,6 @@ volatile int J_down = 0;
 volatile int J_right = 0;
 volatile int J_left = 0;
 volatile int J_click = 0;
-volatile int J_up_left = 0;
-volatile int J_up_right = 0;
-volatile int J_down_left = 0;
-volatile int J_down_right = 0;
 
 
 
@@ -2103,72 +2099,34 @@ volatile int J_down_right = 0;
 void RIT_IRQHandler(void)
 {
     // ------------------------------------
-    // GESTIONE KEY0 (INT0) - Non usato nel Tetris
+    // GESTIONE KEY1 (Start / Pause)
     // ------------------------------------
-    if(down_0 !=0) {
-        down_0++;
-        if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00040) )->FIOPIN & (1<<10)) == 0){
-            switch(down_0) {
-                case 2:
-                    toRelease_down_0 = 1;
-                    break;
-                default:
-                    break;
-            }
-        }
-        else {
-            if(toRelease_down_0){
-                toRelease_down_0=0;
-            }
-            down_0=0;
-            __NVIC_EnableIRQ(EINT0_IRQn);
-            ((LPC_PINCON_TypeDef *) ((0x40000000UL) + 0x2C000) )->PINSEL4 |= (1 << 20);
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // GESTIONE KEY1 (Specifica 2: Start / Pause / Resume)
-    // ---------------------------------------------------------------
     if(down_1 !=0) {
         down_1++;
-        if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00040) )->FIOPIN & (1<<11)) == 0){ // Tasto KEY1 premuto
+        if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00040) )->FIOPIN & (1<<11)) == 0){
             switch(down_1){
                 case 2: // Short Press
-
-                    // --- LOGICA DI GIOCO START/PAUSA ---
-
-                    // CASO 1: AVVIO GIOCO
                     if (currentGameState == GAME_RESET || currentGameState == GAME_OVER) {
-                        // Genera Random Seed basato sul timer attuale
                         srand(((LPC_TIM_TypeDef *) ((0x40000000UL) + 0x04000) )->TC);
-
-                        Game_Reset(); // Resetta grid e score
-                        SpawnNewPiece(); // Crea primo pezzo
-
+                        Game_Reset();
+                        SpawnNewPiece();
                         currentGameState = GAME_PLAYING;
                     }
-                    // CASO 2: METTI IN PAUSA
                     else if (currentGameState == GAME_PLAYING) {
                         currentGameState = GAME_PAUSED;
                         GUI_Text(160, 80, (uint8_t *)"PAUSED", 0xF800, 0x0000);
                     }
-                    // CASO 3: RIPRENDI DALLA PAUSA
                     else if (currentGameState == GAME_PAUSED) {
                         currentGameState = GAME_PLAYING;
-                        GUI_Text(160, 80, (uint8_t *)"      ", 0x0000, 0x0000); // Cancella scritta
+                        GUI_Text(160, 80, (uint8_t *)"      ", 0x0000, 0x0000);
                     }
-                    // -----------------------------------
-
                     toRelease_down_1=1;
                     break;
-                default:
-                    break;
+                default: break;
             }
         }
         else {
-            if(toRelease_down_1){
-                toRelease_down_1=0;
-            }
+            if(toRelease_down_1) toRelease_down_1=0;
             down_1=0;
             __NVIC_EnableIRQ(EINT1_IRQn);
             ((LPC_PINCON_TypeDef *) ((0x40000000UL) + 0x2C000) )->PINSEL4 |= (1 << 22);
@@ -2176,28 +2134,21 @@ void RIT_IRQHandler(void)
     }
 
     // ------------------------------------
-    // GESTIONE KEY2 (Specifica 7: Hard Drop)
+    // GESTIONE KEY2 (Hard Drop)
     // ------------------------------------
     if(down_2 !=0) {
         down_2++;
         if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00040) )->FIOPIN & (1<<12)) == 0){
             switch(down_2){
-                case 2: // Short Press
-                    // Esegui Hard Drop solo se si sta giocando
-                    if (currentGameState == GAME_PLAYING) {
-                        HardDrop();
-                    }
-
+                case 2:
+                    if (currentGameState == GAME_PLAYING) HardDrop();
                     toRelease_down_2=1;
                     break;
-                default:
-                    break;
+                default: break;
             }
         }
         else {
-            if(toRelease_down_2){
-                toRelease_down_2=0;
-            }
+            if(toRelease_down_2) toRelease_down_2=0;
             down_2=0;
             __NVIC_EnableIRQ(EINT2_IRQn);
             ((LPC_PINCON_TypeDef *) ((0x40000000UL) + 0x2C000) )->PINSEL4 |= (1 << 24);
@@ -2205,52 +2156,50 @@ void RIT_IRQHandler(void)
     }
 
     // ===============================================================
-    // GESTIONE JOYSTICK (Specifica 5)
+    // GESTIONE JOYSTICK (IMPLEMENTAZIONE MOVIMENTO LATERALE)
     // ===============================================================
 
-
+   // --- JOYSTICK UP (Rotazione) ---
     if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<29)) == 0 ) {
         J_up++;
         switch(J_up){
             case 1:
-                // Esegui Rotazione
                 if (currentGameState == GAME_PLAYING) RotatePiece();
-                break;
-            default:
-                // Auto-repeat delay potrebbe essere aggiunto qui
                 break;
         }
     } else { J_up=0; }
 
-
+    // --- JOYSTICK DOWN (Soft Drop) ---
     if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<26)) == 0) {
         J_down++;
         switch(J_down){
             case 1:
-                // Prima pressione: muovi giù
                 if (currentGameState == GAME_PLAYING) MovePieceDown();
                 break;
             default:
-                // Se tenuto premuto, scende veloce (ogni 50ms)
+                // Scende veloce se tieni premuto
                  if (currentGameState == GAME_PLAYING) MovePieceDown();
                 break;
         }
     } else { J_down=0; }
 
-
+    // --- JOYSTICK RIGHT (Destra) ---
     if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<28)) == 0) {
         J_right++;
         switch(J_right){
-            case 1:
+            case 1: // Primo scatto immediato
                 if (currentGameState == GAME_PLAYING) MovePieceRight();
                 break;
-             // Opzionale: gestire movimento continuo se tenuto premuto
             default:
+                // Auto-Repeat: muovi ogni 2 cicli (più veloce)
+                if ((J_right % 2) == 0) {
+                     if (currentGameState == GAME_PLAYING) MovePieceRight();
+                }
                 break;
         }
     } else { J_right=0; }
 
-
+    // --- JOYSTICK LEFT (Sinistra) ---
     if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<27)) == 0) {
         J_left++;
         switch(J_left){
@@ -2258,16 +2207,19 @@ void RIT_IRQHandler(void)
                 if (currentGameState == GAME_PLAYING) MovePieceLeft();
                 break;
             default:
+                // Auto-Repeat Sinistra
+                if ((J_left % 2) == 0) {
+                     if (currentGameState == GAME_PLAYING) MovePieceLeft();
+                }
                 break;
         }
     } else { J_left=0; }
 
 
-    if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<25)) == 0) {
-        J_click++;
-        // ...
-    } else { J_click=0; }
+    if(down_0 !=0) { down_0++; if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00040) )->FIOPIN & (1<<10)) == 0){ if(down_0==2) toRelease_down_0=1; } else { if(toRelease_down_0) toRelease_down_0=0; down_0=0; __NVIC_EnableIRQ(EINT0_IRQn); ((LPC_PINCON_TypeDef *) ((0x40000000UL) + 0x2C000) )->PINSEL4 |= (1 << 20); } }
 
+
+    if((((LPC_GPIO_TypeDef *) ((0x2009C000UL) + 0x00020) )->FIOPIN & (1<<25)) == 0) { J_click++; } else { J_click=0; }
 
     ((LPC_RIT_TypeDef *) ((0x40080000UL) + 0x30000) )->RICTRL |= 0x1;
 }
