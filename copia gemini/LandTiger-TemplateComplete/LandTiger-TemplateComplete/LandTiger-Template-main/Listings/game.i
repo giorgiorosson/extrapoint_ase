@@ -2675,17 +2675,20 @@ void MovePieceLeft(void) {
 }
 
 // Specifica 5: Movimento Destra
+// Specifica 5: Movimento Destra
 void MovePieceRight(void) {
     if (currentGameState != GAME_PLAYING) return;
 
-    // Cancella
+    // Cancella vecchio
     Tetromino empty = currentPiece;
     empty.color = 0x0000 // Sfondo del campo (vuoto);
     DrawPiece(empty, currentY, currentX);
 
-    if (!CheckCollision(currentX + 1, currentY, currentPiece)) {
+    // --- DEBUG: COMMENTA IL CONTROLLO COLLISIONI ---
+    // if (!CheckCollision(currentX + 1, currentY, currentPiece)) {
         currentX++;
-    }
+    // }
+    // -----------------------------------------------
 
     // Ridisegna
     DrawPiece(currentPiece, currentY, currentX);
